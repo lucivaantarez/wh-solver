@@ -1,14 +1,14 @@
 name: WinterHub Solver
 
 on:
-  workflow_dispatch:        # manual trigger
+  workflow_dispatch:
   schedule:
-    - cron: '0 */5 * * *'  # auto-restart every 5 hours (in case job ends)
+    - cron: '0 */5 * * *'
 
 jobs:
   solve:
     runs-on: ubuntu-latest
-    timeout-minutes: 350    # 5h 50min max
+    timeout-minutes: 350
 
     steps:
       - name: Checkout repo
@@ -25,7 +25,10 @@ jobs:
       - name: Run solver
         env:
           WH_API_KEY:   ${{ secrets.WH_API_KEY }}
-          WH_COOKIES:   ${{ secrets.WH_COOKIES }}
+          WH_COOKIES_1: ${{ secrets.WH_COOKIES_1 }}
+          WH_COOKIES_2: ${{ secrets.WH_COOKIES_2 }}
+          WH_COOKIES_3: ${{ secrets.WH_COOKIES_3 }}
+          WH_COOKIES_4: ${{ secrets.WH_COOKIES_4 }}
           PLACE_ID:     ${{ vars.PLACE_ID }}
           DELAY_COOKIE: ${{ vars.DELAY_COOKIE }}
           DELAY_LOOP:   ${{ vars.DELAY_LOOP }}
