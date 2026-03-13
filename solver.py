@@ -1,16 +1,23 @@
 import os
 import time
-import json
 import requests
 from datetime import datetime
 
 # ── Config ──────────────────────────────────────────────────────────────────
-BASE_URL     = "https://apiweb.wintercode.dev"
-API_KEY      = os.environ["WH_API_KEY"]
-COOKIES_RAW  = os.environ["WH_COOKIES"]       # newline-separated cookies
+BASE_URL = "https://apiweb.wintercode.dev"
+API_KEY  = os.environ["WH_API_KEY"]
+
+# 4 secrets x 50 cookies each = 200 total
+COOKIES_RAW = (
+    os.environ.get("WH_COOKIES_1", "") + "\n" +
+    os.environ.get("WH_COOKIES_2", "") + "\n" +
+    os.environ.get("WH_COOKIES_3", "") + "\n" +
+    os.environ.get("WH_COOKIES_4", "")
+)
+
 PLACE_ID     = int(os.environ.get("PLACE_ID", "4483381587"))
-DELAY_COOKIE = float(os.environ.get("DELAY_COOKIE", "5"))   # seconds between cookies
-DELAY_LOOP   = float(os.environ.get("DELAY_LOOP", "600"))    # seconds between loops
+DELAY_COOKIE = float(os.environ.get("DELAY_COOKIE", "5"))
+DELAY_LOOP   = float(os.environ.get("DELAY_LOOP", "600"))
 SOLVE_POW    = os.environ.get("SOLVE_POW", "true").lower() == "true"
 SOLVE_POS    = os.environ.get("SOLVE_POS", "true").lower() == "true"
 SOLVE_CAP    = os.environ.get("SOLVE_CAP", "true").lower() == "true"
@@ -23,14 +30,14 @@ HEADERS = {
 
 def log(msg, tag="INFO"):
     ts = datetime.utcnow().strftime("%H:%M:%S")
-    print(f"[{ts}] [{tag}] {msg}")
+    print(f"[{ts}] [{tag}] {msg}", flush=True)
 
 def load_cookies():
     cookies = [c.strip() for c in COOKIES_RAW.splitlines() if c.strip()]
     log(f"Loaded {len(cookies)} cookies")
     return cookies
 
-def solve(endpoint, cookie, label):
+def solve_request(endpoint, cookie, label):
     try:
         res = requests.post(
             f"{BASE_URL}{endpoint}",
@@ -39,7 +46,7 @@ def solve(endpoint, cookie, label):
             timeout=60
         )
         data = res.json()
-        status = data.get("status", "UNKNOWN")
+        status  = data.get("status", "UNKNOWN")
         success = data.get("success", False)
 
         if success:
@@ -65,27 +72,23 @@ def solve_cookie(cookie, index, total):
     log(f"Cookie {index+1}/{total}: {short}")
 
     if SOLVE_POW:
-        status = solve("/api/pow/solve", cookie, "PoW")
+        status = solve_request("/api/pow/solve", cookie, "PoW")
         time.sleep(1)
-
-        # If captcha appeared during PoW, solve it first
         if "CAPTCHA" in status and SOLVE_CAP:
             log("Captcha detected after PoW — solving...", "CAP")
-            solve("/api/captcha/solve", cookie, "Captcha")
+            solve_request("/api/captcha/solve", cookie, "Captcha")
             time.sleep(2)
-            # Retry PoW after captcha
-            solve("/api/pow/solve", cookie, "PoW retry")
+            solve_request("/api/pow/solve", cookie, "PoW retry")
             time.sleep(1)
 
     if SOLVE_POS:
-        status = solve("/api/pow/solve", cookie, "PoS")
+        status = solve_request("/api/pow/solve", cookie, "PoS")
         time.sleep(1)
-
         if "CAPTCHA" in status and SOLVE_CAP:
             log("Captcha detected after PoS — solving...", "CAP")
-            solve("/api/captcha/solve", cookie, "Captcha")
+            solve_request("/api/captcha/solve", cookie, "Captcha")
             time.sleep(2)
-            solve("/api/pow/solve", cookie, "PoS retry")
+            solve_request("/api/pow/solve", cookie, "PoS retry")
             time.sleep(1)
 
 def fetch_balance():
@@ -110,7 +113,6 @@ def main():
         return
 
     loop = 0
-    # GitHub Actions jobs max out at 6 hours — run for ~5.5 hours then exit cleanly
     deadline = time.time() + (5.5 * 3600)
 
     while time.time() < deadline:
